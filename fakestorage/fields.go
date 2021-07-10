@@ -11,7 +11,7 @@ var valueByFieldMap = map[string]interface{}{
 	"id":              func(o Object) interface{} { return o.id() },
 	"name":            func(o Object) interface{} { return o.Name },
 	"bucket":          func(o Object) interface{} { return o.BucketName },
-	"size":            func(o Object) interface{} { return int64(len(o.Content)) },
+	"size":            func(o Object) interface{} { return fmt.Sprintf("%d", len(o.Content)) },
 	"contentType":     func(o Object) interface{} { return o.ContentType },
 	"contentEncoding": func(o Object) interface{} { return o.ContentEncoding },
 	"acl":             func(o Object) interface{} { return getAccessControlsListFromObject(o) },
@@ -20,12 +20,12 @@ var valueByFieldMap = map[string]interface{}{
 	"timeCreated":     func(o Object) interface{} { return o.Created.Format(timestampFormat) },
 	"timeDeleted":     func(o Object) interface{} { return o.Deleted.Format(timestampFormat) },
 	"updated":         func(o Object) interface{} { return o.Updated.Format(timestampFormat) },
-	"generation":      func(o Object) interface{} { return o.Generation },
+	"generation":      func(o Object) interface{} { return fmt.Sprintf("%d", o.Generation) },
 	"metadata":        func(o Object) interface{} { return o.Metadata },
 }
 
 var itemFieldNamesAllowed = getMapKeys(valueByFieldMap)
-var itemsPattern = regexp.MustCompile(`items\((.*)\)$`)
+var itemsPattern = regexp.MustCompile(`items\(([^)]+)\)`)
 
 func getMapKeys(myMap map[string]interface{}) []string {
 	keys := make([]string, 0, len(myMap))
@@ -36,53 +36,69 @@ func getMapKeys(myMap map[string]interface{}) []string {
 }
 
 func ProcessFields(input string) (*fieldsParsingResult, error) {
-	fields := strings.Split(input, ",")
 	result := fieldsParsingResult{Fields: []string{}, ItemFields: []string{}}
+	input, itemFields, err := findItemFields(input)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(fields) == 0 {
+	result.ItemFields = itemFields
+
+	if input == "" {
 		return &result, nil
 	}
 
+	fields := strings.Split(input, ",")
 	for _, field := range fields {
-		if field == "nextPageToken" {
-			// ignore
+		if field == "" || field == "nextPageToken" {
+			// the go client puts a nextPageToken there for some reason
 		} else if field == "kind" || field == "prefixes" {
 			result.Fields = append(result.Fields, field)
 		} else if field == "items" {
 			result.Fields = append(result.Fields, field)
+			// if there's a "items" field, we ignore all the other specific "items(<field>)" fields
 			result.ItemFields = []string{}
 		} else {
-			if itemsPattern.MatchString(field) {
-				if !isInSlice(result.Fields, "items") {
-					err := processItems(&result, field)
-					if err != nil {
-						return nil, err
-					}
-				}
-			} else {
-				return nil, fmt.Errorf("%s is invalid", field)
-			}
+			return nil, fmt.Errorf("%s is invalid", field)
 		}
 	}
 
 	return &result, nil
 }
 
-func processItems(result *fieldsParsingResult, field string) error {
-	match := itemsPattern.FindStringSubmatch(field)
-	itemsFields := match[1]
-	if itemsFields != "" {
-		wantedItemFields := strings.Split(itemsFields, ",")
+func findItemFields(input string) (string, []string, error) {
+	if itemsPattern.MatchString(input) {
+		itemFields, err := processItems(input)
+		if err != nil {
+			return input, nil, err
+		}
+
+		fieldsWithNoItems := itemsPattern.ReplaceAll([]byte(input), []byte(""))
+		return string(fieldsWithNoItems), itemFields, nil
+	} else {
+		return input, []string{}, nil
+	}
+}
+
+func processItems(input string) ([]string, error) {
+	itemFields := []string{}
+	matches := itemsPattern.FindAllStringSubmatch(input, -1)
+	if matches == nil {
+		return []string{}, nil
+	}
+
+	for _, match := range matches {
+		wantedItemFields := strings.Split(match[1], ",")
 		for _, wantedItemField := range wantedItemFields {
 			if isInSlice(itemFieldNamesAllowed, wantedItemField) {
-				result.ItemFields = append(result.ItemFields, wantedItemField)
+				itemFields = append(itemFields, wantedItemField)
 			} else {
-				return fmt.Errorf("%s is invalid", field)
+				return nil, fmt.Errorf("%s is invalid", wantedItemField)
 			}
 		}
 	}
 
-	return nil
+	return itemFields, nil
 }
 
 type fieldsParsingResult struct {

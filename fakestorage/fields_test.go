@@ -57,6 +57,60 @@ func Test__SpecificItemsFields(t *testing.T) {
 	result.GenerateResponse([]string{}, objects)
 }
 
+func Test__SpecificItemsFieldsInDifferentFormat(t *testing.T) {
+	result, _ := ProcessFields("items(name),items(bucket,size)")
+	if len(result.Fields) != 0 {
+		t.Errorf("Wrong result")
+	}
+
+	if len(result.ItemFields) != 3 {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "name") {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "bucket") {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "size") {
+		t.Errorf("Wrong result")
+	}
+
+	result.GenerateResponse([]string{}, objects)
+}
+
+func Test__SpecificItemsFieldsInDifferentFormatAndKind(t *testing.T) {
+	result, _ := ProcessFields("kind,items(name),items(bucket,size)")
+	if len(result.Fields) != 1 {
+		t.Errorf("Wrong result")
+	}
+
+	if len(result.ItemFields) != 3 {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.Fields, "kind") {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "name") {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "bucket") {
+		t.Errorf("Wrong result")
+	}
+
+	if !isInSlice(result.ItemFields, "size") {
+		t.Errorf("Wrong result")
+	}
+
+	result.GenerateResponse([]string{}, objects)
+}
+
 func Test__ItemsAloneOverridesSpecificItemsFields(t *testing.T) {
 	result, _ := ProcessFields("items,items(name),items(bucket)")
 	if len(result.Fields) != 1 {
