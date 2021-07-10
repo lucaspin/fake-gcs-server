@@ -702,22 +702,6 @@ func TestServiceClientListObjects(t *testing.T) {
 	})
 }
 
-func TestServiceClientListObjectsUsingFields(t *testing.T) {
-	runServersTest(t, getObjectsForListTests(), func(t *testing.T, server *Server) {
-		server.CreateBucketWithOpts(CreateBucketOpts{Name: "empty-bucket"})
-		client := server.Client()
-		query := &storage.Query{}
-		query.SetAttrSelection([]string{"Bucket"})
-		iter := client.Bucket("some-bucket").Objects(context.TODO(), query)
-		obj, err := iter.Next()
-		for ; err == nil; obj, err = iter.Next() {
-			if obj.Name != "" {
-				t.Errorf("Object should not have name set")
-			}
-		}
-	})
-}
-
 func TestServerClientListAfterCreate(t *testing.T) {
 	for _, versioningEnabled := range []bool{true, false} {
 		for _, withOverwrites := range []bool{true, false} {

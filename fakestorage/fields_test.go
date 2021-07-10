@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-var objects = []Object{
-	{BucketName: "bucket1", Name: "file1.txt"},
-	{BucketName: "bucket1", Name: "file2.txt"},
-	{BucketName: "bucket1", Name: "file3.txt"},
-	{BucketName: "bucket1", Name: "file4.txt"},
-}
-
 type FieldTestCase struct {
 	testCase           string
 	fields             string
@@ -107,7 +100,7 @@ func TestFieldsParsing(t *testing.T) {
 	testCases := getAllFieldsTestCases()
 	for _, testCase := range testCases {
 		t.Run(testCase.testCase, func(t *testing.T) {
-			result, err := ProcessFields(testCase.fields)
+			result, err := ParseFields(testCase.fields)
 			if testCase.expectedError == nil && err != nil {
 				t.Errorf("expected no error\ngot  %#v", err)
 			} else if testCase.expectedError != nil && err == nil {

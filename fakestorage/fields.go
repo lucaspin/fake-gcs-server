@@ -24,19 +24,13 @@ var valueByFieldMap = map[string]interface{}{
 	"metadata":        func(o Object) interface{} { return o.Metadata },
 }
 
+// there's not yet an implementation for nextPageToken
+var ignoreableFields = []string{"", "nextPageToken"}
 var itemFieldNamesAllowed = getMapKeys(valueByFieldMap)
 var itemsPattern = regexp.MustCompile(`items\(([^)]+)\)`)
 
-func getMapKeys(myMap map[string]interface{}) []string {
-	keys := make([]string, 0, len(myMap))
-	for k := range myMap {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-func ProcessFields(input string) (*fieldsParsingResult, error) {
-	result := fieldsParsingResult{Fields: []string{}, ItemFields: []string{}}
+func ParseFields(input string) (*fieldsResult, error) {
+	result := fieldsResult{Fields: []string{}, ItemFields: []string{}}
 	input, itemFields, err := findItemFields(input)
 	if err != nil {
 		return &result, err
@@ -51,8 +45,8 @@ func ProcessFields(input string) (*fieldsParsingResult, error) {
 	fields := strings.Split(input, ",")
 	for _, field := range fields {
 		trimmedField := strings.Trim(field, " ")
-		if trimmedField == "" || trimmedField == "nextPageToken" {
-			// the go client puts a nextPageToken there for some reason
+		if isInSlice(ignoreableFields, trimmedField) {
+			// just ignore it
 		} else if trimmedField == "kind" || trimmedField == "prefixes" {
 			result.Fields = append(result.Fields, trimmedField)
 		} else if trimmedField == "items" {
@@ -103,12 +97,7 @@ func processItems(input string) ([]string, error) {
 	return itemFields, nil
 }
 
-type fieldsParsingResult struct {
-	Fields     []string
-	ItemFields []string
-}
-
-func (r *fieldsParsingResult) GenerateResponse(prefixes []string, objects []Object) interface{} {
+func (r *fieldsResult) GenerateResponse(prefixes []string, objects []Object) interface{} {
 	if len(r.Fields) == 0 && len(r.ItemFields) == 0 {
 		return newListObjectsResponse(objects, prefixes)
 	}
@@ -138,7 +127,12 @@ func (r *fieldsParsingResult) GenerateResponse(prefixes []string, objects []Obje
 	return response
 }
 
-func (r *fieldsParsingResult) generateItems(objects []Object) []map[string]interface{} {
+type fieldsResult struct {
+	Fields     []string
+	ItemFields []string
+}
+
+func (r *fieldsResult) generateItems(objects []Object) []map[string]interface{} {
 	items := []map[string]interface{}{}
 	for _, object := range objects {
 		item := map[string]interface{}{}
@@ -160,4 +154,12 @@ func isInSlice(slice []string, value string) bool {
 	}
 
 	return false
+}
+
+func getMapKeys(myMap map[string]interface{}) []string {
+	keys := make([]string, 0, len(myMap))
+	for k := range myMap {
+		keys = append(keys, k)
+	}
+	return keys
 }

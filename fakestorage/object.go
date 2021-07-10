@@ -11,7 +11,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -145,12 +144,6 @@ func (acl aclRule) MarshalJSON() ([]byte, error) {
 		ProjectTeam: (*projectTeam)(acl.ProjectTeam),
 	}
 	return json.Marshal(temp)
-}
-
-func (o *Object) getValueByFieldName(fieldName string) string {
-	r := reflect.ValueOf(o)
-	f := reflect.Indirect(r).FieldByName(fieldName)
-	return f.String()
 }
 
 // UnmarshalJSON for ACLRule to customize field names
@@ -413,7 +406,7 @@ func (s *Server) listObjects(r *http.Request) jsonResponse {
 	if fields == "" {
 		return jsonResponse{data: newListObjectsResponse(objs, prefixes)}
 	} else {
-		result, err := ProcessFields(fields)
+		result, err := ParseFields(fields)
 		if err != nil {
 			return jsonResponse{status: http.StatusBadRequest, errorMessage: err.Error()}
 		} else {
