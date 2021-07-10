@@ -38,6 +38,7 @@ func ParseFields(input string) (*fieldsResult, error) {
 
 	result.ItemFields = itemFields
 
+	// if there's no more fields after parsing item fields, just return
 	if input == "" {
 		return &result, nil
 	}
@@ -51,7 +52,7 @@ func ParseFields(input string) (*fieldsResult, error) {
 			result.Fields = append(result.Fields, trimmedField)
 		} else if trimmedField == "items" {
 			result.Fields = append(result.Fields, trimmedField)
-			// if there's a "items" field, we ignore all the other specific "items(<field>)" fields
+			// if there's an "items" field, we ignore all the other specific "items(<field>)" fields
 			result.ItemFields = []string{}
 		} else {
 			return &result, fmt.Errorf("%s is invalid", trimmedField)
@@ -63,11 +64,12 @@ func ParseFields(input string) (*fieldsResult, error) {
 
 func findItemFields(input string) (string, []string, error) {
 	if itemsPattern.MatchString(input) {
-		itemFields, err := processItemFields(input)
+		itemFields, err := parseItemFields(input)
 		if err != nil {
 			return input, []string{}, err
 		}
 
+		// remove item fields from the input so they are no processed again
 		fieldsWithNoItems := itemsPattern.ReplaceAll([]byte(input), []byte(""))
 		return string(fieldsWithNoItems), itemFields, nil
 	} else {
@@ -75,7 +77,7 @@ func findItemFields(input string) (string, []string, error) {
 	}
 }
 
-func processItemFields(input string) ([]string, error) {
+func parseItemFields(input string) ([]string, error) {
 	itemFields := []string{}
 	matches := itemsPattern.FindAllStringSubmatch(input, -1)
 	if matches == nil {
@@ -85,6 +87,7 @@ func processItemFields(input string) ([]string, error) {
 	for _, match := range matches {
 		group := match[1]
 		if group == "" {
+			// items() case with no field inside the parenthesis
 			continue
 		}
 
