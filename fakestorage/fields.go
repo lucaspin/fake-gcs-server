@@ -39,7 +39,7 @@ func ProcessFields(input string) (*fieldsParsingResult, error) {
 	result := fieldsParsingResult{Fields: []string{}, ItemFields: []string{}}
 	input, itemFields, err := findItemFields(input)
 	if err != nil {
-		return nil, err
+		return &result, err
 	}
 
 	result.ItemFields = itemFields
@@ -50,16 +50,17 @@ func ProcessFields(input string) (*fieldsParsingResult, error) {
 
 	fields := strings.Split(input, ",")
 	for _, field := range fields {
-		if field == "" || field == "nextPageToken" {
+		trimmedField := strings.Trim(field, " ")
+		if trimmedField == "" || trimmedField == "nextPageToken" {
 			// the go client puts a nextPageToken there for some reason
-		} else if field == "kind" || field == "prefixes" {
-			result.Fields = append(result.Fields, field)
-		} else if field == "items" {
-			result.Fields = append(result.Fields, field)
+		} else if trimmedField == "kind" || trimmedField == "prefixes" {
+			result.Fields = append(result.Fields, trimmedField)
+		} else if trimmedField == "items" {
+			result.Fields = append(result.Fields, trimmedField)
 			// if there's a "items" field, we ignore all the other specific "items(<field>)" fields
 			result.ItemFields = []string{}
 		} else {
-			return nil, fmt.Errorf("%s is invalid", field)
+			return &result, fmt.Errorf("%s is invalid", trimmedField)
 		}
 	}
 
@@ -70,7 +71,7 @@ func findItemFields(input string) (string, []string, error) {
 	if itemsPattern.MatchString(input) {
 		itemFields, err := processItems(input)
 		if err != nil {
-			return input, nil, err
+			return input, []string{}, err
 		}
 
 		fieldsWithNoItems := itemsPattern.ReplaceAll([]byte(input), []byte(""))
@@ -90,10 +91,11 @@ func processItems(input string) ([]string, error) {
 	for _, match := range matches {
 		wantedItemFields := strings.Split(match[1], ",")
 		for _, wantedItemField := range wantedItemFields {
-			if isInSlice(itemFieldNamesAllowed, wantedItemField) {
-				itemFields = append(itemFields, wantedItemField)
+			trimmedField := strings.Trim(wantedItemField, " ")
+			if isInSlice(itemFieldNamesAllowed, trimmedField) {
+				itemFields = append(itemFields, trimmedField)
 			} else {
-				return nil, fmt.Errorf("%s is invalid", wantedItemField)
+				return nil, fmt.Errorf("%s is invalid", trimmedField)
 			}
 		}
 	}

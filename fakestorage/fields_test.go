@@ -1,127 +1,126 @@
 package fakestorage
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 )
 
-// items
-// items()
-// items(name)
-// items(name,bucket)
-// items(name),items(bucket)
-// kind,items(name,bucket)
-
 var objects = []Object{
 	{BucketName: "bucket1", Name: "file1.txt"},
+	{BucketName: "bucket1", Name: "file2.txt"},
+	{BucketName: "bucket1", Name: "file3.txt"},
+	{BucketName: "bucket1", Name: "file4.txt"},
 }
 
-func Test__AllFields(t *testing.T) {
-	result, _ := ProcessFields("kind,prefixes,items")
-	if len(result.Fields) != 3 {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.Fields, "kind") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.Fields, "prefixes") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.Fields, "items") {
-		t.Errorf("Wrong result")
-	}
-
-	result.GenerateResponse([]string{}, objects)
+type FieldTestCase struct {
+	testCase           string
+	fields             string
+	expectedFields     []string
+	expectedItemFields []string
+	expectedError      error
 }
 
-func Test__SpecificItemsFields(t *testing.T) {
-	result, _ := ProcessFields("items(name),items(bucket)")
-	if len(result.Fields) != 0 {
-		t.Errorf("Wrong result")
+func getAllFieldsTestCases() []FieldTestCase {
+	return []FieldTestCase{
+		{
+			"kind, prefixes and full items",
+			"kind,prefixes,items",
+			[]string{"kind", "prefixes", "items"},
+			[]string{},
+			nil,
+		},
+		{
+			"kind, prefixes and full items with spaces",
+			"kind    ,    prefixes,  items  ",
+			[]string{"kind", "prefixes", "items"},
+			[]string{},
+			nil,
+		},
+		{
+			"kind and specific items field",
+			"kind,items(name)",
+			[]string{"kind"},
+			[]string{"name"},
+			nil,
+		},
+		{
+			"only specific items fields",
+			"items(name),items(bucket)",
+			[]string{},
+			[]string{"name", "bucket"},
+			nil,
+		},
+		{
+			"only specific items fields with spaces",
+			"items(  name  ),items(  bucket  )",
+			[]string{},
+			[]string{"name", "bucket"},
+			nil,
+		},
+		{
+			"only specific items fields in items(<field1>,<field2>) format",
+			"items(name,bucket)",
+			[]string{},
+			[]string{"name", "bucket"},
+			nil,
+		},
+		{
+			"only specific items fields in both formats",
+			"items(name,bucket),items(size)",
+			[]string{},
+			[]string{"name", "bucket", "size"},
+			nil,
+		},
+		{
+			"only invalid field",
+			"invalid-field",
+			[]string{},
+			[]string{},
+			fmt.Errorf("invalid-field is invalid"),
+		},
+		{
+			"valid field and invalid field",
+			"kind,invalid-field",
+			[]string{"kind"},
+			[]string{},
+			fmt.Errorf("invalid-field is invalid"),
+		},
+		{
+			"only invalid item field",
+			"items(invalid-field)",
+			[]string{},
+			[]string{},
+			fmt.Errorf("invalid-field is invalid"),
+		},
+		{
+			"valid and invalid item field",
+			"items(name,invalid-field)",
+			[]string{},
+			[]string{},
+			fmt.Errorf("invalid-field is invalid"),
+		},
 	}
-
-	if len(result.ItemFields) != 2 {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "name") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "bucket") {
-		t.Errorf("Wrong result")
-	}
-
-	result.GenerateResponse([]string{}, objects)
 }
 
-func Test__SpecificItemsFieldsInDifferentFormat(t *testing.T) {
-	result, _ := ProcessFields("items(name),items(bucket,size)")
-	if len(result.Fields) != 0 {
-		t.Errorf("Wrong result")
-	}
+func TestFieldsParsing(t *testing.T) {
+	testCases := getAllFieldsTestCases()
+	for _, testCase := range testCases {
+		t.Run(testCase.testCase, func(t *testing.T) {
+			result, err := ProcessFields(testCase.fields)
+			if testCase.expectedError == nil && err != nil {
+				t.Errorf("expected no error\ngot  %#v", err)
+			} else if testCase.expectedError != nil && err == nil {
+				t.Errorf("expected error %#v\ngot %#v", testCase.expectedError, err)
+			}
 
-	if len(result.ItemFields) != 3 {
-		t.Errorf("Wrong result")
-	}
+			if !reflect.DeepEqual(result.Fields, testCase.expectedFields) {
+				t.Errorf("wrong fields returned\nwant %#v\ngot  %#v", testCase.expectedFields, result.Fields)
+			}
 
-	if !isInSlice(result.ItemFields, "name") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "bucket") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "size") {
-		t.Errorf("Wrong result")
-	}
-
-	result.GenerateResponse([]string{}, objects)
-}
-
-func Test__SpecificItemsFieldsInDifferentFormatAndKind(t *testing.T) {
-	result, _ := ProcessFields("kind,items(name),items(bucket,size)")
-	if len(result.Fields) != 1 {
-		t.Errorf("Wrong result")
-	}
-
-	if len(result.ItemFields) != 3 {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.Fields, "kind") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "name") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "bucket") {
-		t.Errorf("Wrong result")
-	}
-
-	if !isInSlice(result.ItemFields, "size") {
-		t.Errorf("Wrong result")
-	}
-
-	result.GenerateResponse([]string{}, objects)
-}
-
-func Test__ItemsAloneOverridesSpecificItemsFields(t *testing.T) {
-	result, _ := ProcessFields("items,items(name),items(bucket)")
-	if len(result.Fields) != 1 {
-		t.Errorf("Wrong result")
-	}
-
-	if len(result.ItemFields) != 0 {
-		t.Errorf("Wrong result: %v", result.ItemFields)
-	}
-
-	if !isInSlice(result.Fields, "items") {
-		t.Errorf("Wrong result")
+			if !reflect.DeepEqual(result.ItemFields, testCase.expectedItemFields) {
+				t.Errorf("wrong item fields returned\nwant %#v\ngot  %#v", testCase.expectedItemFields, result.ItemFields)
+			}
+		})
 	}
 }
