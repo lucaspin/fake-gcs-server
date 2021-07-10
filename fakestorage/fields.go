@@ -27,7 +27,7 @@ var valueByFieldMap = map[string]interface{}{
 // there's not yet an implementation for nextPageToken
 var ignoreableFields = []string{"", "nextPageToken"}
 var itemFieldNamesAllowed = getMapKeys(valueByFieldMap)
-var itemsPattern = regexp.MustCompile(`items\(([^)]+)\)`)
+var itemsPattern = regexp.MustCompile(`items\(([^)]*)\)`)
 
 func ParseFields(input string) (*fieldsResult, error) {
 	result := fieldsResult{Fields: []string{}, ItemFields: []string{}}
@@ -63,7 +63,7 @@ func ParseFields(input string) (*fieldsResult, error) {
 
 func findItemFields(input string) (string, []string, error) {
 	if itemsPattern.MatchString(input) {
-		itemFields, err := processItems(input)
+		itemFields, err := processItemFields(input)
 		if err != nil {
 			return input, []string{}, err
 		}
@@ -75,7 +75,7 @@ func findItemFields(input string) (string, []string, error) {
 	}
 }
 
-func processItems(input string) ([]string, error) {
+func processItemFields(input string) ([]string, error) {
 	itemFields := []string{}
 	matches := itemsPattern.FindAllStringSubmatch(input, -1)
 	if matches == nil {
@@ -83,7 +83,12 @@ func processItems(input string) ([]string, error) {
 	}
 
 	for _, match := range matches {
-		wantedItemFields := strings.Split(match[1], ",")
+		group := match[1]
+		if group == "" {
+			continue
+		}
+
+		wantedItemFields := strings.Split(group, ",")
 		for _, wantedItemField := range wantedItemFields {
 			trimmedField := strings.Trim(wantedItemField, " ")
 			if isInSlice(itemFieldNamesAllowed, trimmedField) {

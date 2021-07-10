@@ -38,6 +38,13 @@ func getAllFieldsTestCases() []FieldTestCase {
 			nil,
 		},
 		{
+			"empty items",
+			"items()",
+			[]string{},
+			[]string{},
+			nil,
+		},
+		{
 			"only specific items fields",
 			"items(name),items(bucket)",
 			[]string{},
