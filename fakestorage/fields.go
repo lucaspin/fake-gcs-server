@@ -6,15 +6,28 @@ import (
 	"strings"
 )
 
-var jsonFieldNameToStructFieldName = map[string]string{
-	"name":   "Name",
-	"bucket": "Bucket",
+var valueByFieldMap = map[string]interface{}{
+	"kind":            func(o Object) interface{} { return "storage#object" },
+	"id":              func(o Object) interface{} { return o.id() },
+	"name":            func(o Object) interface{} { return o.Name },
+	"bucket":          func(o Object) interface{} { return o.BucketName },
+	"size":            func(o Object) interface{} { return int64(len(o.Content)) },
+	"contentType":     func(o Object) interface{} { return o.ContentType },
+	"contentEncoding": func(o Object) interface{} { return o.ContentEncoding },
+	"acl":             func(o Object) interface{} { return getAccessControlsListFromObject(o) },
+	"crc32c":          func(o Object) interface{} { return o.Crc32c },
+	"md5Hash":         func(o Object) interface{} { return o.Md5Hash },
+	"timeCreated":     func(o Object) interface{} { return o.Created.Format(timestampFormat) },
+	"timeDeleted":     func(o Object) interface{} { return o.Deleted.Format(timestampFormat) },
+	"updated":         func(o Object) interface{} { return o.Updated.Format(timestampFormat) },
+	"generation":      func(o Object) interface{} { return o.Generation },
+	"metadata":        func(o Object) interface{} { return o.Metadata },
 }
 
-var itemFieldNamesAllowed = getMapKeys(jsonFieldNameToStructFieldName)
-var itemsPattern = regexp.MustCompile(`items\((.*)\)`)
+var itemFieldNamesAllowed = getMapKeys(valueByFieldMap)
+var itemsPattern = regexp.MustCompile(`items\((.*)\)$`)
 
-func getMapKeys(myMap map[string]string) []string {
+func getMapKeys(myMap map[string]interface{}) []string {
 	keys := make([]string, 0, len(myMap))
 	for k := range myMap {
 		keys = append(keys, k)
@@ -41,7 +54,10 @@ func ProcessFields(input string) (*fieldsParsingResult, error) {
 		} else {
 			if itemsPattern.MatchString(field) {
 				if !isInSlice(result.Fields, "items") {
-					processItems(&result, field)
+					err := processItems(&result, field)
+					if err != nil {
+						return nil, err
+					}
 				}
 			} else {
 				return nil, fmt.Errorf("%s is invalid", field)
@@ -89,8 +105,12 @@ func (r *fieldsParsingResult) GenerateResponse(prefixes []string, objects []Obje
 	}
 
 	if isInSlice(r.Fields, "items") {
-		response["items"] = objects
-	} else {
+		items := make([]interface{}, len(objects))
+		for i, obj := range objects {
+			items[i] = newObjectResponse(obj)
+		}
+		response["items"] = items
+	} else if len(r.ItemFields) > 0 {
 		items := r.generateItems(objects)
 		if len(items) > 0 {
 			response["items"] = items
@@ -105,8 +125,8 @@ func (r *fieldsParsingResult) generateItems(objects []Object) []map[string]inter
 	for _, object := range objects {
 		item := map[string]interface{}{}
 		for _, itemField := range r.ItemFields {
-			structFieldName := jsonFieldNameToStructFieldName[itemField]
-			item[itemField] = object.getValueByFieldName(structFieldName)
+			getValue := valueByFieldMap[itemField]
+			item[itemField] = getValue.(func(Object) interface{})(object)
 		}
 		items = append(items, item)
 	}

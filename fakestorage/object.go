@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"reflect"
@@ -414,10 +413,9 @@ func (s *Server) listObjects(r *http.Request) jsonResponse {
 	if fields == "" {
 		return jsonResponse{data: newListObjectsResponse(objs, prefixes)}
 	} else {
-		log.Printf("Processing fields: %s", fields)
 		result, err := ProcessFields(fields)
 		if err != nil {
-			return jsonResponse{status: http.StatusBadRequest}
+			return jsonResponse{status: http.StatusBadRequest, errorMessage: err.Error()}
 		} else {
 			return jsonResponse{data: result.GenerateResponse(prefixes, objs)}
 		}
